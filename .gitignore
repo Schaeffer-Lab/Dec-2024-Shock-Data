@@ -9,3 +9,4 @@ phasespace250_3
 smaller_fields.h5
 smaller_moments.h5
 smaller_prts.h5
+*.h5
