@@ -1,4 +1,5 @@
 Electron Energy (keV)	Electrons Distance (mm)
+0 0
 100	2.430921686
 129.1549665	2.906076149
 166.8100537	3.462439826
