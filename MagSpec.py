@@ -330,6 +330,7 @@ class MagSpec:
             #initial particle position when entering the slit
             y_0 = 0,
             z_0 = 0,
+            track_termination = False,
             ):
         #initializing variables
         P = self.EtoP(Energy_eV)
@@ -623,8 +624,17 @@ class MagSpec:
                 x_array.append(x)
                 y_array.append(y)
                 z_array.append(z)
-                
-        return np.array(x_array), np.array(y_array), np.array(z_array)
+        if track_termination == True and terminate == True:
+            X_ARRAY = [False]
+            Y_ARRAY = [False]
+            Z_ARRAY = [False]
+            #print('terminated')
+        else:
+            X_ARRAY = np.array(x_array)
+            Y_ARRAY = np.array(y_array)
+            Z_ARRAY = np.array(z_array)
+
+        return X_ARRAY, Y_ARRAY, Z_ARRAY
     
     def find_focus(
             self,
@@ -982,16 +992,18 @@ class MagSpec:
         Y_data = []
         Z_data = []
 
+        terminated_list = []
+
         #assuming a point source at a distance dtcc from the slit, we initialize particles at different positions and pitch angles
         #for the collimated version, the range describes the range of y values directly
-        for i in Range:
+        for i in range(len(Range)):
             #the particle position when it enters the slit depends on its pitch angle from TCC
             if source == 'point':
-                theta = i
+                theta = Range[i]
                 y_0 = -self.TCC_x*math.sin(theta)*math.cos(theta_z)+self.TCC_y
                 z_0 = -self.TCC_x*math.sin(theta_z)+self.TCC_z
             elif source == 'collimated':
-                y_0 = i
+                y_0 = Range[i]
                 z_0 = 0
                 theta = theta_0
             
@@ -1001,17 +1013,39 @@ class MagSpec:
                 theta_0 = theta,
                 theta_z = theta_z,
                 y_0 = y_0,
-                z_0 = z_0
+                z_0 = z_0,
+                track_termination=True
                 )
             #here we plot the trajectory of each initialized particle
             if plotting == True:
                 plt.plot(X,Y)
             #we then index the final position of the particle when it hits the IP
-            X_data.append(X[-1])
-            Y_data.append(Y[-1])
-            Z_data.append(Z[-1])
 
-        IP_dist_val = self.XYtoIP(X_data,Y_data)
+            dummy_value = self.TCC_x-1
+
+            if X[0] != False:
+                X_data.append(X[-1])
+                Y_data.append(Y[-1])
+                Z_data.append(Z[-1])
+            elif X[0] == False:
+                X_data.append(dummy_value)
+                Y_data.append(dummy_value)
+                Z_data.append(dummy_value)
+                terminated_list.append(i)
+            else:
+                X_data.append(X[-1])
+                Y_data.append(Y[-1])
+                Z_data.append(Z[-1])
+
+        if len(terminated_list) > len([]):
+            IP_dist_val_a = np.zeros(len(terminated_list))
+            for i in terminated_list:
+                X_data.pop(i)
+                Y_data.pop(i)
+            IP_dist_val_b = self.XYtoIP(X_data,Y_data)
+            IP_dist_val = np.concatenate((IP_dist_val_a,np.array(IP_dist_val_b)))
+        else:
+            IP_dist_val = self.XYtoIP(X_data,Y_data)
 
         if plotting == True:
             plt.axis('equal')
@@ -1384,20 +1418,58 @@ class MagSpec:
 
 
     #dispersion relation
-    def EXdispersion(self,Espace = np.linspace(100,10100,501), theta_0 = 0, theta_z = 0, y_0 = 0, z_0 = 0):
+    def EXdispersion(
+            self,
+            Espace = np.linspace(100,10100,501), 
+            theta_0 = 0, 
+            theta_z = 0, 
+            y_0 = 0, 
+            z_0 = 0,
+            track_termination = False):
         X_data = []
         Y_data = []
-        for E in Espace:
-            X, Y, Z = self.track_particle(
-                Energy_eV = E,
-                theta_0 = theta_0,
-                theta_z = theta_z,
-                y_0 = y_0,
-                z_0 = z_0
-                )
-            X_data.append(X[-1])
-            Y_data.append(Y[-1])
-        IP_dist_val = self.XYtoIP(X_data,Y_data)
+        if track_termination == False:
+            for E in Espace:
+                X, Y, Z = self.track_particle(
+                    Energy_eV = E,
+                    theta_0 = theta_0,
+                    theta_z = theta_z,
+                    y_0 = y_0,
+                    z_0 = z_0
+                    )
+                X_data.append(X[-1])
+                Y_data.append(Y[-1])
+            IP_dist_val = self.XYtoIP(X_data,Y_data)
+        if track_termination == True:
+            IP_dist_val = []
+            for E in Espace:
+                X, Y, Z = self.track_particle(
+                    Energy_eV = E,
+                    theta_0 = theta_0,
+                    theta_z = theta_z,
+                    y_0 = y_0,
+                    z_0 = z_0,
+                    track_termination=True
+                    )
+                if X[0] != False:
+                    X_data.append(X[-1])
+                    Y_data.append(Y[-1])
+                elif X[0] == False:
+                    X_data.append(-1)
+                    Y_data.append(-1)
+            #print(X_data)
+            for i in range(len(X_data)):
+                true_indices = np.where(np.array(X_data) != -1)
+                
+                IP_values = np.array(self.XYtoIP(np.array(X_data)[true_indices],np.array(Y_data)[true_indices]))
+                if len(IP_values) == len(X_data):
+                    false_values = np.array([])
+                else:
+                    false_values = np.zeros(len(X_data)-len(IP_values))
+
+                IP_dist_val = np.concatenate((false_values,IP_values))
+
+            IP_dist_val = np.array(IP_dist_val)
         return IP_dist_val
     
     def varying_slit_function(
@@ -1515,6 +1587,181 @@ class MagSpec:
             #if you want to visualize a slit function at some value x_space[i]:
             #plot plot_data_axes[i] against slit_function_data[i]
         return x_space, plot_data_axes, slit_function_data, IP_data
+    
+    def delta_E_spread(
+        self,
+        E_space = np.linspace(2500,502500,201),
+        source = 'point',
+        #this is the range of theta values
+        Range = np.linspace(-0.002,0.002,51),
+        theta_0 = 0,
+        theta_z = 0,
+        Padding = [0.5,1],
+        type = "x-centered"):
+        
+        #we want to first create a modified energy space to ensure that edge effects do not affect our function
+        Espace_add_start = np.linspace(((1-Padding[0])*E_space[0]),0.99*E_space[0],int(100*Padding[0]))
+        Espace_add_end = np.linspace((1.01*E_space[-1]),(1+Padding[1])*E_space[-1],int(100*Padding[1]))
+        Espace = np.concatenate((Espace_add_start,E_space,Espace_add_end))
+        #print(Espace)
+
+        x_dispersion_normal = self.EXdispersion(Espace)
+
+        if type == 'x-centered' or 'X-centered':
+            delta_e_list = []
+
+            for Energy in E_space:
+                IP_dist_val, X_data, Y_data, Z_data = self.track_1D_slit(
+                plotting = False,
+                Energy_eV = Energy,
+                source = source,
+                Range = Range, 
+                theta_z = theta_z,
+                theta_0 = theta_0)
+
+                IP_dist_val = np.array(IP_dist_val)
+                IP_dist_val = IP_dist_val[np.where(IP_dist_val != 0)]
+
+                position_edge_1 = np.min(IP_dist_val)
+                position_edge_2 = np.max(IP_dist_val)
+
+                energy_edge_1 = np.interp(position_edge_1,x_dispersion_normal,Espace)
+                energy_edge_2 = np.interp(position_edge_2,x_dispersion_normal,Espace)
+
+                delta_E = abs(energy_edge_2-energy_edge_1)
+
+                delta_e_list.append(delta_E)
+            
+            delta_E_over_E = np.divide(delta_e_list,E_space)
+
+
+        elif type == 'e-centered' or 'E-centered':
+            #first we init the dispersion relation for a normal/central incident particle
+
+            #this list holds all x-arrays for the dispersion relation of each incident particle (of varying positions and pitch angles)
+            x_dispersion_list = []
+
+            #we have to account for all dispersions that include particles not making it onto the IP
+            hit_wall_list = []
+            jump_indices = []
+            first_x_list = []
+
+            #now we find the dispersion relation for each incident particle at all positons/angles and add it to the list
+            for i in Range:
+                if source == 'point':
+                    theta = i
+                    y_0 = -self.TCC_x*math.tan(theta)*math.cos(theta_z)+self.TCC_y
+                elif source == 'collimated':
+                    y_0 = i
+                    theta = theta_0
+                #here we init a dispersion for each particle i entering the slit: x_i = f_i(E)
+                #we will obtain a dispersion relation for each pitch angle and starting position initialized from 'source'
+                xrange_i = self.EXdispersion(
+                Espace= Espace,
+                theta_0 = theta,
+                theta_z = theta_z,
+                y_0 = y_0,
+                z_0 = 0,
+                track_termination=True)
+
+                if any(x == 0 for x in xrange_i):
+                    print("hit detected")
+
+                    hit_wall_list.append(True)
+                    hit_position_list = np.where(xrange_i == 0)
+                    print(hit_position_list[0])
+                    jump_index = hit_position_list[0][-1]
+
+                    firstx = xrange_i[jump_index+1]
+                    print(str(firstx))
+                    print(str(xrange_i[hit_position_list[0][0]]))
+                else:
+                    hit_wall_list.append(False)
+
+                    print("no hit detected")
+                    jump_index = int(-1)
+
+                    firstx = xrange_i[0]
+                    print(str(firstx))
+                
+                first_x_list.append(firstx)
+
+                print(str(jump_index))
+                jump_indices.append(jump_index)
+
+                x_dispersion_list.append(xrange_i)
+
+            print(jump_indices)
+
+            #now we init another for loop that runs through each position/energy in the normal/central incident dispersion curve.
+            #for each position, we want to find the particle with the highest energy that can reach that position, 
+            #and the particle with the lowest energy that can reach that position
+            #so, we initialize a list of maximum energy of particles that can reach some position x,
+            #and another list for the minimum energy of particle that can reach that position
+            #and finally, a list to store the energy uncertainty delta_E
+
+            max_energies = []
+            min_energies = []
+            delta_E_list = []
+
+            for i in range(len(E_space)):
+                Energy = E_space[i]
+                x_position = np.interp(Energy, Espace, x_dispersion_normal)
+                #for each position, we want to find the particle with the highest energy that can reach that position, 
+                #and the particle with the lowest energy that can reach that position
+                
+                #thus, we initialize a list to hold all energies that could reach that position
+                energy_list_for_x = []
+
+                for i in range(len(Range)):
+                    #we first extract the dispersion relation of each particle i (of various initial positions and pitch angles)
+                    x_dispersion_temp = x_dispersion_list[i]
+
+                    #we need to check if any dispersions include particles hitting the collimator plate
+                    if hit_wall_list[i] == True:
+                        
+                        first_x = first_x_list[i]
+                        #print('hit index = ' + str(hit_index+1))
+                        #print('first x position in dispersion = ' + str(first_x))
+                        #print('current x position = ' + str(x_position))
+
+                        if x_position > first_x:
+                            #then, we use interpolation to determine the energy that particle needs to reach the position of interest
+                            Energy_value_temp = np.interp(x_position, x_dispersion_temp, Espace)
+
+                            #finally, we append this energy value to the list of energy values we created earlier
+                            energy_list_for_x.append(Energy_value_temp)
+                            print("no hit - detected")
+
+                        elif x_position <= first_x:
+                            print("hit - detected")
+                            #print(hit_index+1)
+
+                        else:
+                            print("hit - detected")
+                            #print(hit_index+1)
+
+                    else:
+                        #then, we use interpolation to determine the energy that particle needs to reach the position of interest
+                        Energy_value_temp = np.interp(x_position, x_dispersion_temp, Espace)
+
+                        #finally, we append this energy value to the list of energy values we created earlier
+                        energy_list_for_x.append(Energy_value_temp)
+
+                #now that we have a list of energy values for the position variable x_position,
+                #we can search for the maximum and minimum values of energy for that position
+
+                max_energy = np.max(energy_list_for_x)
+                min_energy = np.min(energy_list_for_x)
+                delta_E = max_energy-min_energy
+
+                max_energies.append(max_energy)
+                min_energies.append(min_energy)
+                delta_E_list.append(delta_E)
+
+            delta_E_over_E = np.divide(delta_E_list,E_space)
+                    
+        return delta_E_over_E
 
     #3D particle tracker
     def particle_pusher_3D(
