@@ -1940,7 +1940,10 @@ class MagSpec:
             self,
             Energy_eV,
             theta_y_range,
-            theta_z_range):
+            theta_z_range,
+            x0 = 0,
+            y0 = 0,
+            z0 = 0):
         Y = []
         Z = []
         for theta_y in theta_y_range:
@@ -1949,9 +1952,9 @@ class MagSpec:
                 xarray, yarray, zarray = self.particle_tracker_3D(
                     Energy_eV, 
                     vhat = vhat,
-                    x_0 = True,
-                    y_0 = True,
-                    z_0 = True)
+                    x_0 = x0,
+                    y_0 = y0,
+                    z_0 = z0)
                 Y.append(yarray[-1])
                 Z.append(zarray[-1])
         return np.array(Y), np.array(Z)
