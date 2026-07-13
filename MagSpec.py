@@ -869,7 +869,7 @@ class MagSpec:
             crossing = 0
         return crossing, np.array(x1_array), np.array(y1_array), np.array(x2_array), np.array(y2_array)
     
-    def generate_IP(self, energylist = np.logspace(2.5,6.5,65), slit_width = 0.001, plotting = True, apply = False):
+    def generate_IP(self, energylist = np.logspace(2.5,6.5,65), slit_width = 0.001, plotting = True, apply = False, Traces = True):
         x1list = []
         y1list = []
         x2list = []
@@ -906,25 +906,31 @@ class MagSpec:
         crossing_array = np.array(crossing_list)
 
         if plotting == True:
-            i = 0
-            while i < len(energylist):
-                energy = str(energylist[i])
-                plt.plot(x1list[i], y1list[i], linestyle = '--', color = 'darkred')
-                plt.plot(x2list[i], y2list[i], linestyle = '--', color = 'darkred')
-                plt.scatter(crossing_list[i+shift][0], crossing_list[i+shift][1], color = 'red', label = 'E = ' + energy)
-                i += 10
-            plt.plot(crossing_array[:,0],crossing_array[:,1])
+            if Traces == True:
+                i = 0
+                while i < len(energylist):
+                    energy = str(energylist[i])
+                    plt.plot(x1list[i], y1list[i], linestyle = '--', color = 'darkred')
+                    plt.plot(x2list[i], y2list[i], linestyle = '--', color = 'darkred')
+                    plt.scatter(crossing_list[i+shift][0], crossing_list[i+shift][1], color = 'red', label = 'E = ' + energy)
+                    i += 10
+
+            plt.plot(crossing_array[:,0],crossing_array[:,1], linestyle = '--', label = 'optimized IP')
     
         return crossing_array
 
     #plotting IP
     def plotIP(self,figsize = [6,6]):
-        plt.figure(figsize = figsize)
+        fig, ax = plt.subplots(1,1,figsize = figsize)
+        #plt.figure(figsize = figsize)
         gap_x_bar = [-self.gapx,0]
         gap_y_bar = [self.gapy,self.gapy]
-        plt.plot(self.IP_x,self.IP_y, color = 'blue', label = 'Image Plate')
-        plt.plot(gap_x_bar,gap_y_bar, linestyle = '--', color = 'darkred')
-        plt.plot([gap_x_bar[-1],self.IP_x[0]],[gap_y_bar[-1],self.IP_y[0]], linestyle = '--', color = 'darkred')
+        ax.plot(self.IP_x,self.IP_y, color = 'blue', linestyle = '-.', label = 'current IP', linewidth = 1.75)
+        ax.plot(gap_x_bar,gap_y_bar, linestyle = '--', color = 'darkred', linewidth = 1.75)
+        ax.plot([gap_x_bar[-1],self.IP_x[0]],[gap_y_bar[-1],self.IP_y[0]], linestyle = '--', color = 'darkred', linewidth = 1.75)
+        for location in ['left', 'right', 'top', 'bottom']:
+            ax.spines[location].set_linewidth(2)
+        return fig, ax
 
     def XYtoIP(self,X_data,Y_data):
         if self.plate == 'curved':
@@ -984,8 +990,8 @@ class MagSpec:
         #it determines the incidence angle of the collimated beam on the slit
         theta_z = 0,
         #this determines the pitch angle for ALL particles towards the z axis (magnetic field vector)
-        theta_0 = 0
-        ):
+        theta_0 = 0,
+        setaxes = True):
         
     #here we initialize arrays to collect the X and Y positions of the particles when they hit the IP
         X_data = []
@@ -1029,8 +1035,8 @@ class MagSpec:
                 Z_data.append(Z[-1])
             elif X[0] == False:
                 X_data.append(dummy_value)
-                Y_data.append(dummy_value)
-                Z_data.append(dummy_value)
+                Y_data.append(0)
+                Z_data.append(0)
                 terminated_list.append(i)
             else:
                 X_data.append(X[-1])
@@ -1038,17 +1044,19 @@ class MagSpec:
                 Z_data.append(Z[-1])
 
         if len(terminated_list) > len([]):
-            IP_dist_val_a = np.zeros(len(terminated_list))
-            for i in terminated_list:
-                X_data.pop(i)
-                Y_data.pop(i)
-            IP_dist_val_b = self.XYtoIP(X_data,Y_data)
-            IP_dist_val = np.concatenate((IP_dist_val_a,np.array(IP_dist_val_b)))
+            # IP_dist_val_a = np.zeros(len(terminated_list))
+            # for i in terminated_list:
+            #     X_data.pop(i)
+            #     Y_data.pop(i)
+            # IP_dist_val_b = self.XYtoIP(X_data,Y_data)
+            # IP_dist_val = np.concatenate((IP_dist_val_a,np.array(IP_dist_val_b)))
+            IP_dist_val = self.XYtoIP(X_data,Y_data)
         else:
             IP_dist_val = self.XYtoIP(X_data,Y_data)
 
         if plotting == True:
-            plt.axis('equal')
+            if setaxes == True:
+                plt.axis('equal')
             
         return IP_dist_val, X_data, Y_data, Z_data
     
